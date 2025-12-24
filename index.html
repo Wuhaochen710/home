@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>圣诞快乐 - 修正版</title>
+    <style>
+        body { margin: 0; background-color: #000; overflow: hidden; font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+        canvas { display: block; }
+        #main-title {
+            position: absolute; top: 30px; left: 30px; color: white; font-size: 32px;
+            font-weight: bold; text-shadow: 0 0 15px rgba(255, 182, 193, 0.7); z-index: 100;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="main-title">Merry Christmas</div>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        let width, height, particles = [], stars = [], blessings = [], fireworks = [];
+        let state = 'SHOW_TREE'; 
+        let stateStartTime = Date.now();
+        let nextGenTime = 0; 
+
+        // 祝福语修正：心想事成
+        const blessingList = ["欢欢喜喜", "天天开心", "万事如意", "健康常乐", "幸福平安", "心想事成", "好运连连", "永不挂科", "好事成双", "财源滚滚", "学有所成", "考试顺利", "学习进步", "未来可期"];
+        const treeColors = ['rgba(255,182,193,', 'rgba(255,255,255,', 'rgba(255,0,0,', 'rgba(50,205,50,'];
+
+        const FONT_SIZE = 42;
+        const BOX_H = 75;
+        const GEN_INTERVAL = 125; // 匀速节奏
+
+        function init() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            particles = []; stars = [];
+            for (let i = 0; i < 200; i++) stars.push({ x: Math.random() * width, y: Math.random() * height, size: Math.random() * 2, blink: Math.random() });
+            for (let i = 0; i < 2200; i++) {
+                const t = i / 2200;
+                const angle = t * Math.PI * 30;
+                const radius = (1 - t) * 260; 
+                particles.push({
+                    x: Math.cos(angle) * radius, y: -t * 620, z: Math.sin(angle) * radius,
+                    color: treeColors[Math.floor(Math.random() * treeColors.length)],
+                    size: Math.random() * 2.5 + 1
+                });
+            }
+        }
+
+        function createFirework(x, y) {
+            for (let i = 0; i < 20; i++) {
+                fireworks.push({
+                    x: x, y: y,
+                    vx: (Math.random() - 0.5) * 12, vy: (Math.random() - 0.5) * 12,
+                    life: 1.0, color: `hsl(${340 + Math.random() * 20}, 100%, 75%)`
+                });
+            }
+        }
+
+        function isOverlapping(newX, newY, newW, newH) {
+            for (let b of blessings) {
+                if (newX < b.x + b.w + 10 && newX + newW + 10 > b.x && 
+                    newY < b.y + b.h + 10 && newY + newH + 10 > b.y) return true;
+            }
+            return false;
+        }
+
+        function drawBlessing(b, time) {
+            const driftX = Math.sin(time + b.seed) * 8;
+            const driftY = Math.cos(time + b.seed) * 8;
+            ctx.save();
+            ctx.translate(b.x + driftX, b.y + driftY);
+            ctx.font = `bold ${FONT_SIZE}px 'Microsoft YaHei'`;
+            const text = "祝你" + b.text;
+            const w = b.w, h = b.h;
+            
+            ctx.shadowBlur = 25; ctx.shadowColor = "rgba(255, 182, 193, 0.7)";
+            ctx.fillStyle = "rgba(255, 255, 255, 0.25)";
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
+            ctx.lineWidth = 2;
+            
+            const r = 15;
+            ctx.beginPath(); ctx.moveTo(r, 0); ctx.lineTo(w-r, 0); ctx.quadraticCurveTo(w, 0, w, r);
+            ctx.lineTo(w, h-r); ctx.quadraticCurveTo(w, h, w-r, h); ctx.lineTo(r, h);
+            ctx.quadraticCurveTo(0, h, 0, h-r); ctx.lineTo(0, r); ctx.quadraticCurveTo(0, 0, r, 0);
+            ctx.closePath(); ctx.fill(); ctx.stroke();
+
+            ctx.fillStyle = "#fff"; ctx.shadowBlur = 5; ctx.shadowColor = "#000";
+            ctx.fillText(text, 25, 52);
+            ctx.restore();
+        }
+
+        function animate() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.fillRect(0, 0, width, height);
+            const now = Date.now();
+            const elapsed = now - stateStartTime;
+            const time = now * 0.001;
+
+            if (state === 'SHOW_TREE' && elapsed > 3000) {
+                state = 'FILLING'; stateStartTime = now; nextGenTime = now;
+            } else if (state === 'FILLING' && elapsed > 10000) {
+                state = 'REST'; stateStartTime = now;
+            } else if (state === 'REST' && elapsed > 2000) {
+                blessings = []; fireworks = []; state = 'SHOW_TREE'; stateStartTime = now;
+            }
+
+            stars.forEach(s => {
+                ctx.fillStyle = `rgba(255,255,255,${Math.abs(Math.sin(time + s.blink))})`;
+                ctx.beginPath(); ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2); ctx.fill();
+            });
+
+            ctx.save();
+            ctx.translate(width / 2, height * 0.85);
+            ctx.fillStyle = '#1a0d0d'; ctx.fillRect(-20, 0, 40, 60);
+            particles.forEach((p, i) => {
+                const rotX = p.x * Math.cos(time * 0.5) - p.z * Math.sin(time * 0.5);
+                ctx.fillStyle = p.color + (Math.sin(time * 2 + i) * 0.5 + 0.5) + ')';
+                ctx.beginPath(); ctx.arc(rotX, p.y, p.size, 0, Math.PI * 2); ctx.fill();
+            });
+            ctx.restore();
+
+            if (state === 'FILLING' && now >= nextGenTime) {
+                const txt = blessingList[Math.floor(Math.random() * blessingList.length)];
+                ctx.font = `bold ${FONT_SIZE}px 'Microsoft YaHei'`;
+                const mw = ctx.measureText("祝你" + txt).width + 50;
+                
+                let tx, ty;
+                let success = false;
+
+                // 匀速生成 + 前5秒防重叠
+                if (elapsed < 5000) {
+                    for (let attempts = 0; attempts < 100; attempts++) {
+                        tx = Math.random() * (width - mw);
+                        ty = Math.random() * (height - BOX_H);
+                        if (!isOverlapping(tx, ty, mw, BOX_H)) {
+                            success = true;
+                            break;
+                        }
+                    }
+                } else {
+                    tx = Math.random() * (width - mw);
+                    ty = Math.random() * (height - BOX_H);
+                    success = true;
+                }
+
+                if (success) {
+                    blessings.push({ x: tx, y: ty, w: mw, h: BOX_H, text: txt, seed: Math.random() * 10 });
+                    createFirework(tx + mw / 2, ty + BOX_H / 2);
+                }
+
+                nextGenTime += GEN_INTERVAL;
+                if (now - nextGenTime > 1000) nextGenTime = now;
+            }
+
+            blessings.forEach(b => drawBlessing(b, time));
+
+            fireworks.forEach((f, i) => {
+                f.x += f.vx; f.y += f.vy; f.vy += 0.06; f.life -= 0.025;
+                let opacity = f.life > 0.3 ? 1 : f.life / 0.3;
+                if (f.life > 0) {
+                    ctx.fillStyle = `hsla(345, 100%, 75%, ${opacity})`;
+                    ctx.beginPath(); ctx.arc(f.x, f.y, 2.5, 0, Math.PI * 2); ctx.fill();
+                } else fireworks.splice(i, 1);
+            });
+
+            requestAnimationFrame(animate);
+        }
+
+        window.addEventListener('resize', init);
+        init();
+        animate();
+    </script>
+</body>
+</html>
